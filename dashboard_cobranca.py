@@ -3,21 +3,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import calendar
 from pathlib import Path
-import locale
 from config_emails import load_email_config, load_smtp_config, save_smtp_config
 from email_utils import enviar_email_outlook, criar_corpo_email, enviar_email_smtp, verificar_smtp_auth
 from utils import BASE_DIR
 
-# Configurar locale para português brasileiro
-try:
-    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
-except Exception:
-    try:
-        locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')
-    except Exception:
-        pass
 
 def find_aging_file():
     """Procura por arquivos .xlsb no diretório base, ignorando arquivos temporários do Excel"""
@@ -1049,6 +1039,11 @@ def render_dashboard_cobranca():
                                         horizontal=True
                                     )
                                     
+                                    confirmar_massa = st.checkbox(
+                                        f"⚠️ Confirmo o envio de **{len(emails_a_enviar)} emails** para os vendedores listados acima",
+                                        value=False
+                                    )
+                                    
                                     col_confirm, col_cancel = st.columns(2)
                                     with col_confirm:
                                         enviar_massa_btn = st.form_submit_button(f"✅ Enviar {len(emails_a_enviar)} Emails", use_container_width=True)
@@ -1056,102 +1051,105 @@ def render_dashboard_cobranca():
                                         cancelar_massa_btn = st.form_submit_button("❌ Cancelar", use_container_width=True)
                                 
                                 if enviar_massa_btn:
-                                    # Pré-checagem SMTP antes do envio em massa
-                                    smtp_ok = True
-                                    if metodo_envio != "📧 Outlook":
-                                        smtp_config = load_smtp_config()
-                                        if not smtp_config or not smtp_config.get('usuario'):
-                                            st.session_state.email_resultado = {'sucesso': False, 'mensagem': '❌ SMTP não configurado.'}
-                                            st.session_state.mostrar_preview_email = False
-                                            st.rerun()
-                                        valido, msg_auth = verificar_smtp_auth(
-                                            servidor_smtp=smtp_config.get('servidor'),
-                                            porta=smtp_config.get('porta', 587),
-                                            usuario=smtp_config.get('usuario'),
-                                            senha=smtp_config.get('senha'),
-                                            usar_tls=smtp_config.get('usar_tls', True)
-                                        )
-                                        if not valido:
-                                            st.session_state.smtp_senha_expirada = True
-                                            st.session_state.email_resultado = {'sucesso': False, 'mensagem': f'❌ {msg_auth}\n\n🔑 Atualize a senha no topo da página.'}
-                                            st.session_state.mostrar_preview_email = False
-                                            st.rerun()
+                                    if not confirmar_massa:
+                                        st.error("❌ Marque a caixa de confirmação antes de enviar em massa.")
+                                    else:
+                                        # Pré-checagem SMTP antes do envio em massa
+                                        smtp_ok = True
+                                        if metodo_envio != "📧 Outlook":
+                                            smtp_config = load_smtp_config()
+                                            if not smtp_config or not smtp_config.get('usuario'):
+                                                st.session_state.email_resultado = {'sucesso': False, 'mensagem': '❌ SMTP não configurado.'}
+                                                st.session_state.mostrar_preview_email = False
+                                                st.rerun()
+                                            valido, msg_auth = verificar_smtp_auth(
+                                                servidor_smtp=smtp_config.get('servidor'),
+                                                porta=smtp_config.get('porta', 587),
+                                                usuario=smtp_config.get('usuario'),
+                                                senha=smtp_config.get('senha'),
+                                                usar_tls=smtp_config.get('usar_tls', True)
+                                            )
+                                            if not valido:
+                                                st.session_state.smtp_senha_expirada = True
+                                                st.session_state.email_resultado = {'sucesso': False, 'mensagem': f'❌ {msg_auth}\n\n🔑 Atualize a senha no topo da página.'}
+                                                st.session_state.mostrar_preview_email = False
+                                                st.rerun()
 
-                                    # Enviar para cada vendedor
-                                    resultados = []
-                                    progress_bar = st.progress(0)
-                                    status_text = st.empty()
-                                    
-                                    for idx, info in enumerate(emails_a_enviar):
-                                        vendedor = info['vendedor']
-                                        email_vend = info['email']
-                                        cc_vend = info['cc']
+                                        # Enviar para cada vendedor
+                                        resultados = []
+                                        progress_bar = st.progress(0)
+                                        status_text = st.empty()
                                         
-                                        status_text.text(f"Enviando para {vendedor}... ({idx+1}/{len(emails_a_enviar)})")
-                                        
-                                        # Filtrar boletos deste vendedor
-                                        df_vendedor = df_email[df_email['Nome Vendedor'] == vendedor].copy()
-                                        
-                                        # Criar corpo do email para este vendedor
-                                        corpo_vendedor = criar_corpo_email(
-                                            vendedor,
-                                            df_vendedor,
-                                            datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-                                        )
-                                        
-                                        # Enviar
-                                        try:
-                                            if metodo_envio == "📧 Outlook":
-                                                sucesso, msg = enviar_email_outlook(
-                                                    email_vend,
-                                                    "Relatório de Boletos em Atraso",
-                                                    corpo_vendedor,
-                                                    cc_list=cc_vend if cc_vend else None,
-                                                    cc_global=cc_global if cc_global else None
-                                                )
-                                            else:
-                                                sucesso, msg = enviar_email_smtp(
-                                                    email_vend,
-                                                    "Relatório de Boletos em Atraso",
-                                                    corpo_vendedor,
-                                                    cc_list=cc_vend if cc_vend else None,
-                                                    cc_global=cc_global if cc_global else None,
-                                                    servidor_smtp=smtp_config.get('servidor'),
-                                                    porta=smtp_config.get('porta', 587),
-                                                    usuario=smtp_config.get('usuario'),
-                                                    senha=smtp_config.get('senha'),
-                                                    usar_tls=smtp_config.get('usar_tls', True)
-                                                )
+                                        for idx, info in enumerate(emails_a_enviar):
+                                            vendedor = info['vendedor']
+                                            email_vend = info['email']
+                                            cc_vend = info['cc']
                                             
-                                            resultados.append({'vendedor': vendedor, 'sucesso': sucesso, 'msg': msg})
-                                        except Exception as e:
-                                            resultados.append({'vendedor': vendedor, 'sucesso': False, 'msg': str(e)})
+                                            status_text.text(f"Enviando para {vendedor}... ({idx+1}/{len(emails_a_enviar)})")
+                                            
+                                            # Filtrar boletos deste vendedor
+                                            df_vendedor = df_email[df_email['Nome Vendedor'] == vendedor].copy()
+                                            
+                                            # Criar corpo do email para este vendedor
+                                            corpo_vendedor = criar_corpo_email(
+                                                vendedor,
+                                                df_vendedor,
+                                                datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                                            )
+                                            
+                                            # Enviar
+                                            try:
+                                                if metodo_envio == "📧 Outlook":
+                                                    sucesso, msg = enviar_email_outlook(
+                                                        email_vend,
+                                                        "Relatório de Boletos em Atraso",
+                                                        corpo_vendedor,
+                                                        cc_list=cc_vend if cc_vend else None,
+                                                        cc_global=cc_global if cc_global else None
+                                                    )
+                                                else:
+                                                    sucesso, msg = enviar_email_smtp(
+                                                        email_vend,
+                                                        "Relatório de Boletos em Atraso",
+                                                        corpo_vendedor,
+                                                        cc_list=cc_vend if cc_vend else None,
+                                                        cc_global=cc_global if cc_global else None,
+                                                        servidor_smtp=smtp_config.get('servidor'),
+                                                        porta=smtp_config.get('porta', 587),
+                                                        usuario=smtp_config.get('usuario'),
+                                                        senha=smtp_config.get('senha'),
+                                                        usar_tls=smtp_config.get('usar_tls', True)
+                                                    )
+                                                
+                                                resultados.append({'vendedor': vendedor, 'sucesso': sucesso, 'msg': msg})
+                                            except Exception as e:
+                                                resultados.append({'vendedor': vendedor, 'sucesso': False, 'msg': str(e)})
+                                            
+                                            progress_bar.progress((idx + 1) / len(emails_a_enviar))
                                         
-                                        progress_bar.progress((idx + 1) / len(emails_a_enviar))
-                                    
-                                    status_text.empty()
-                                    progress_bar.empty()
-                                    
-                                    # Resumo dos resultados
-                                    enviados_ok = sum(1 for r in resultados if r['sucesso'])
-                                    enviados_erro = len(resultados) - enviados_ok
-                                    
-                                    mensagem_resultado = f"📊 **Resultado do Envio em Massa:**\n\n"
-                                    mensagem_resultado += f"✅ Enviados com sucesso: {enviados_ok}\n"
-                                    mensagem_resultado += f"❌ Com erro: {enviados_erro}\n\n"
-                                    
-                                    for r in resultados:
-                                        if r['sucesso']:
-                                            mensagem_resultado += f"✅ {r['vendedor']}\n"
-                                        else:
-                                            mensagem_resultado += f"❌ {r['vendedor']}: {r['msg'][:50]}...\n"
-                                    
-                                    st.session_state.email_resultado = {
-                                        'sucesso': enviados_ok > 0,
-                                        'mensagem': mensagem_resultado
-                                    }
-                                    st.session_state.mostrar_preview_email = False
-                                    st.rerun()
+                                        status_text.empty()
+                                        progress_bar.empty()
+                                        
+                                        # Resumo dos resultados
+                                        enviados_ok = sum(1 for r in resultados if r['sucesso'])
+                                        enviados_erro = len(resultados) - enviados_ok
+                                        
+                                        mensagem_resultado = f"📊 **Resultado do Envio em Massa:**\n\n"
+                                        mensagem_resultado += f"✅ Enviados com sucesso: {enviados_ok}\n"
+                                        mensagem_resultado += f"❌ Com erro: {enviados_erro}\n\n"
+                                        
+                                        for r in resultados:
+                                            if r['sucesso']:
+                                                mensagem_resultado += f"✅ {r['vendedor']}\n"
+                                            else:
+                                                mensagem_resultado += f"❌ {r['vendedor']}: {r['msg'][:50]}...\n"
+                                        
+                                        st.session_state.email_resultado = {
+                                            'sucesso': enviados_ok > 0,
+                                            'mensagem': mensagem_resultado
+                                        }
+                                        st.session_state.mostrar_preview_email = False
+                                        st.rerun()
                                 
                                 if cancelar_massa_btn:
                                     st.session_state.mostrar_preview_email = False

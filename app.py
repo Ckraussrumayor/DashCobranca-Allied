@@ -348,21 +348,27 @@ if not st.session_state.get('startup_recovery_done', False):
 
     # Tentar restaurar base de dados do email se não existe localmente
     if not xlsb_existente:
-        try:
-            ok, resultado = restaurar_backup_dados(str(BASE_DIR))
-            if ok:
-                st.toast(f"☁️ Base restaurada do backup: {Path(resultado).name}", icon="✅")
-        except Exception:
-            pass
+        with st.spinner("☁️ Restaurando base de dados do backup..."):
+            try:
+                ok, resultado = restaurar_backup_dados(str(BASE_DIR))
+                if ok:
+                    st.toast(f"☁️ Base restaurada do backup: {Path(resultado).name}", icon="✅")
+                else:
+                    st.toast(f"⚠️ Backup de dados não disponível: {resultado}", icon="⚠️")
+            except Exception as e:
+                st.toast(f"❌ Falha ao restaurar backup de dados: {e}", icon="❌")
 
     # Tentar restaurar configs do email se não existem localmente
     if not config_json_existente:
-        try:
-            ok, msg = restaurar_backup_configs(str(BASE_DIR))
-            if ok:
-                st.toast("☁️ Configurações restauradas do backup!", icon="✅")
-        except Exception:
-            pass
+        with st.spinner("☁️ Restaurando configurações do backup..."):
+            try:
+                ok, msg = restaurar_backup_configs(str(BASE_DIR))
+                if ok:
+                    st.toast("☁️ Configurações restauradas do backup!", icon="✅")
+                else:
+                    st.toast(f"⚠️ Backup de configs não disponível: {msg}", icon="⚠️")
+            except Exception as e:
+                st.toast(f"❌ Falha ao restaurar backup de configs: {e}", icon="❌")
 
 # Verificar se precisa de import manual (sem .xlsb e sem backup)
 xlsb_existente = [f for f in BASE_DIR.glob("*.xlsb") if not f.name.startswith("~$")]
@@ -447,6 +453,7 @@ except Exception as e:
 # ── Função reutilizável de upload de base .xlsb na sidebar ──────────────────
 def _render_sidebar_upload(uploader_key: str):
     """Renderiza o bloco de upload + status da base .xlsb na sidebar."""
+    _MAX_UPLOAD_MB = 50
     st.sidebar.subheader("🔄 Atualizar Base de Dados")
     arquivo = st.sidebar.file_uploader(
         "Selecione o novo arquivo .xlsb",
@@ -455,30 +462,34 @@ def _render_sidebar_upload(uploader_key: str):
         help="Selecione um arquivo .xlsb para substituir a base atual"
     )
     if arquivo is not None:
-        file_id = f"{arquivo.name}_{arquivo.size}"
-        state_key = f"last_uploaded_{uploader_key}"
-        if st.session_state.get(state_key) != file_id:
-            for f in BASE_DIR.glob("*.xlsb"):
-                if not f.name.startswith("~$"):
-                    f.unlink()
-            novo_caminho = BASE_DIR / arquivo.name
-            novo_caminho.write_bytes(arquivo.getvalue())
-            st.cache_data.clear()
-            st.session_state.pop('df_aging', None)
-            st.session_state.pop('erro_aging', None)
-            st.session_state[state_key] = file_id
-            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo.name}")
-            try:
-                ok_bkp, msg_bkp = enviar_backup_dados(str(novo_caminho))
-                if ok_bkp:
-                    st.sidebar.caption("☁️ Backup atualizado no email")
-                else:
-                    st.sidebar.caption(f"⚠️ Backup: {msg_bkp}")
-            except Exception:
-                pass
-            st.rerun()
+        tamanho_mb = arquivo.size / (1024 * 1024)
+        if tamanho_mb > _MAX_UPLOAD_MB:
+            st.sidebar.error(f"❌ Arquivo muito grande ({tamanho_mb:.1f} MB). Limite: {_MAX_UPLOAD_MB} MB.")
         else:
-            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo.name}")
+            file_id = f"{arquivo.name}_{arquivo.size}"
+            state_key = f"last_uploaded_{uploader_key}"
+            if st.session_state.get(state_key) != file_id:
+                for f in BASE_DIR.glob("*.xlsb"):
+                    if not f.name.startswith("~$"):
+                        f.unlink()
+                novo_caminho = BASE_DIR / arquivo.name
+                novo_caminho.write_bytes(arquivo.getvalue())
+                st.cache_data.clear()
+                st.session_state.pop('df_aging', None)
+                st.session_state.pop('erro_aging', None)
+                st.session_state[state_key] = file_id
+                st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo.name}")
+                try:
+                    ok_bkp, msg_bkp = enviar_backup_dados(str(novo_caminho))
+                    if ok_bkp:
+                        st.sidebar.caption("☁️ Backup atualizado no email")
+                    else:
+                        st.sidebar.caption(f"⚠️ Backup: {msg_bkp}")
+                except Exception:
+                    pass
+                st.rerun()
+            else:
+                st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo.name}")
     xlsb_atual = [f for f in BASE_DIR.glob("*.xlsb") if not f.name.startswith("~$")]
     if xlsb_atual:
         st.sidebar.caption(f"📂 Atual: **{xlsb_atual[0].name}**")
