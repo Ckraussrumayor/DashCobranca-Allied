@@ -1,20 +1,35 @@
 import streamlit as st
-import sys
-import os
-import platform
-from pathlib import Path
-import locale
-import shutil
-import hashlib
-import random
-import string
-from datetime import datetime, timedelta
+import traceback
 
-from backup_utils import (
-    enviar_backup_dados, enviar_backup_configs,
-    restaurar_backup_dados, restaurar_backup_configs,
-    verificar_backup_disponivel
+# Configuração da página PRIMEIRO (permite exibir erros na tela do Cloud)
+st.set_page_config(
+    page_title="Dashboard Allied - Menu Principal",
+    page_icon="🏠",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+try:
+    import sys
+    import os
+    import platform
+    from pathlib import Path
+    import locale
+    import shutil
+    import hashlib
+    import random
+    import string
+    from datetime import datetime, timedelta
+
+    from backup_utils import (
+        enviar_backup_dados, enviar_backup_configs,
+        restaurar_backup_dados, restaurar_backup_configs,
+        verificar_backup_disponivel
+    )
+except Exception as _import_error:
+    st.error(f"Erro ao importar módulos: {_import_error}")
+    st.code(traceback.format_exc())
+    st.stop()
 
 # Função para obter o diretório base do aplicativo
 def get_base_path():
@@ -40,14 +55,6 @@ except:
         locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')
     except:
         pass
-
-# Configuração da página
-st.set_page_config(
-    page_title="Dashboard Allied - Menu Principal",
-    page_icon="🏠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # CSS customizado
 st.markdown("""
@@ -374,15 +381,17 @@ if _precisa_upload_base or _precisa_import_config:
 try:
     from dashboard_cobranca import render_dashboard_cobranca
     cobranca_disponivel = True
-except ImportError as e:
+except Exception as e:
     st.error(f"Erro ao importar dashboard_cobranca: {e}")
+    st.code(traceback.format_exc())
     cobranca_disponivel = False
 
 try:
     from config_emails import render_configuracoes
     config_disponivel = True
-except ImportError as e:
+except Exception as e:
     st.error(f"Erro ao importar config_emails: {e}")
+    st.code(traceback.format_exc())
     config_disponivel = False
 
 # Botão de logout na sidebar (visível em todas as páginas após login)
