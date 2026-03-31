@@ -67,8 +67,6 @@ EMAIL_TEMPLATE = """
 </body>
 </html>
 """
-except ImportError:
-    OUTLOOK_AVAILABLE = False
 
 try:
     import pythoncom
