@@ -1,7 +1,7 @@
 import streamlit as st
 import sys
 import os
-import signal
+import platform
 from pathlib import Path
 import locale
 import shutil
@@ -503,11 +503,13 @@ elif st.session_state.page == 'cobranca':
     else:
         st.error("❌ Não foi possível carregar o dashboard de Cobrança")
     
-    # Botão encerrar no fim do sidebar
-    st.sidebar.markdown("---")
-    if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
-        st.sidebar.warning("Encerrando o Dashboard...")
-        os.kill(os.getpid(), signal.SIGTERM)
+    # Botão encerrar no fim do sidebar (apenas local/Windows)
+    if platform.system() == 'Windows':
+        st.sidebar.markdown("---")
+        if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
+            st.sidebar.warning("Encerrando o Dashboard...")
+            import signal
+            os.kill(os.getpid(), signal.SIGTERM)
 
 # Configurações
 elif st.session_state.page == 'config':
@@ -577,8 +579,10 @@ elif st.session_state.page == 'config':
     else:
         st.error("❌ Não foi possível carregar a página de configurações")
     
-    # Botão encerrar no fim do sidebar
-    st.sidebar.markdown("---")
-    if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
-        st.sidebar.warning("Encerrando o Dashboard...")
-        os.kill(os.getpid(), signal.SIGTERM)
+    # Botão encerrar no fim do sidebar (apenas local/Windows)
+    if platform.system() == 'Windows':
+        st.sidebar.markdown("---")
+        if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
+            st.sidebar.warning("Encerrando o Dashboard...")
+            import signal
+            os.kill(os.getpid(), signal.SIGTERM)

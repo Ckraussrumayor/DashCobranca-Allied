@@ -58,7 +58,7 @@ def _conectar_imap(config):
     """Conecta ao servidor IMAP."""
     servidor = config.get('servidor_imap') or _inferir_imap(config.get('servidor', ''))
     porta = int(config.get('porta_imap', 993))
-    conn = imaplib.IMAP4_SSL(servidor, porta)
+    conn = imaplib.IMAP4_SSL(servidor, porta, timeout=15)
     conn.login(config['usuario'], config['senha'])
     return conn
 
