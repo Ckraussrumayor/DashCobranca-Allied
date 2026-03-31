@@ -1,0 +1,68 @@
+# .gitignore para Dashboard Zoho CRM
+
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ambientes virtuais
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Dados de negócio (backup por email, não subir no Git)
+*.xlsb
+*.xlsx
+
+# Configs com credenciais (ficam nos secrets do Streamlit Cloud)
+email_config.json
+email_config_smtp.json
+auth_config.json
+
+# Backups temporários
+_backup_configs.zip
+
+# Excel temporários
+~$*.xlsx
+~$*.xls
+~$*.xlsb
+
+# Logs
+*.log
+
+# BATs de execução local (não usados no cloud)
+ABRIR_DASHBOARD_8503.bat
+ABRIR_DASHBOARD_TUNNEL.bat
+
+# Sistema
+Thumbs.db
