@@ -83,7 +83,7 @@ def limpar_faixa_indicador(faixa_com_indicador):
         resultado = resultado.replace(emoji, '')
     return resultado.strip()
 
-@st.cache_data(ttl=3600, show_spinner="Carregando dados...")
+@st.cache_data(ttl=300, show_spinner="Carregando dados...")
 def load_aging_data():
     """Carrega os dados do arquivo de aging - OTIMIZADO para velocidade"""
     aging_file, erro = find_aging_file()
@@ -200,7 +200,7 @@ def classificar_atraso(dias_atraso):
     else:
         return "+365 dias"
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_observacoes_atrasos():
     """Carrega observações da aba 'Atrasos' para cruzamento por Grupo Cliente - OTIMIZADO"""
     aging_file, _ = find_aging_file()
@@ -774,11 +774,12 @@ def render_dashboard_cobranca():
             df_exibir['✓'] = st.session_state.df_selecao_todos
             del st.session_state.df_selecao_todos
         
-        # Usar data_editor para permitir seleção
+        # Usar data_editor para permitir seleção (altura fixa para melhor navegação)
         df_editado = st.data_editor(
             df_exibir,
             use_container_width=True,
             hide_index=True,
+            height=400,
             column_config={
                 "✓": st.column_config.CheckboxColumn(
                     "Enviar",

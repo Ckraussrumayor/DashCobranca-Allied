@@ -16,6 +16,60 @@ try:
 except ImportError:
     OUTLOOK_AVAILABLE = False
 
+# ── Template HTML do email de boletos ────────────────────────────────────────
+EMAIL_TEMPLATE = """
+<html>
+<head>
+<style>
+    body {{
+        font-family: Arial, sans-serif;
+        color: #333;
+        margin: 20px;
+    }}
+    .header {{
+        background-color: #0066cc;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }}
+    .info {{
+        background-color: #f0f0f0;
+        padding: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #0066cc;
+    }}
+    h2 {{
+        color: #0066cc;
+    }}
+</style>
+</head>
+<body>
+    <div class="header">
+        <h1>Relatorio de Boletos em Atraso</h1>
+    </div>
+    
+    <div class="info">
+        <p><strong>Vendedor:</strong> {vendedor_nome}</p>
+        <p><strong>Data de Geracao:</strong> {data_geracao}</p>
+        <p><strong>Total de Boletos:</strong> {total_boletos}</p>
+        <p><strong>Valor Total:</strong> {valor_total_fmt}</p>
+    </div>
+    
+    <h2>Detalhes dos Boletos</h2>
+    {html_tabela}
+    
+    <br><br>
+    <p style="color: #999; font-size: 12px;">
+        Este e um email automatico gerado pelo Dashboard Allied.<br>
+        Favor nao responder este email.
+    </p>
+</body>
+</html>
+"""
+except ImportError:
+    OUTLOOK_AVAILABLE = False
+
 try:
     import pythoncom
     PYTHONCOM_AVAILABLE = True
@@ -271,56 +325,13 @@ def criar_corpo_email(vendedor_nome, df_tabela, data_geracao):
     # Formatar valor total
     valor_total_fmt = f"R$ {valor_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     
-    corpo = f"""
-    <html>
-    <head>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            color: #333;
-            margin: 20px;
-        }}
-        .header {{
-            background-color: #0066cc;
-            color: white;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }}
-        .info {{
-            background-color: #f0f0f0;
-            padding: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #0066cc;
-        }}
-        h2 {{
-            color: #0066cc;
-        }}
-    </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>Relatorio de Boletos em Atraso</h1>
-        </div>
-        
-        <div class="info">
-            <p><strong>Vendedor:</strong> {vendedor_nome}</p>
-            <p><strong>Data de Geracao:</strong> {data_geracao}</p>
-            <p><strong>Total de Boletos:</strong> {len(df_tabela)}</p>
-            <p><strong>Valor Total:</strong> {valor_total_fmt}</p>
-        </div>
-        
-        <h2>Detalhes dos Boletos</h2>
-        {html_tabela}
-        
-        <br><br>
-        <p style="color: #999; font-size: 12px;">
-            Este e um email automatico gerado pelo Dashboard Allied.<br>
-            Favor nao responder este email.
-        </p>
-    </body>
-    </html>
-    """
+    corpo = EMAIL_TEMPLATE.format(
+        vendedor_nome=vendedor_nome,
+        data_geracao=data_geracao,
+        total_boletos=len(df_tabela),
+        valor_total_fmt=valor_total_fmt,
+        html_tabela=html_tabela
+    )
     
     return corpo
 

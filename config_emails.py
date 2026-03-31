@@ -17,7 +17,7 @@ def find_aging_file():
         return xlsb_files[0]
     return None
 
-@st.cache_data(ttl=3600, show_spinner="Carregando vendedores...")
+@st.cache_data(ttl=300, show_spinner="Carregando vendedores...")
 def load_vendedores_do_dashboard():
     """Carrega lista de vendedores únicos do arquivo de dados - OTIMIZADO com cache"""
     try:

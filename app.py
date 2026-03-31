@@ -450,6 +450,15 @@ except Exception as e:
     st.code(traceback.format_exc())
     config_disponivel = False
 
+# ── Botão encerrar reutilizável (apenas local/Windows) ──────────────────────
+def _render_encerrar_button():
+    if platform.system() == 'Windows':
+        st.sidebar.markdown("---")
+        if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
+            st.sidebar.warning("Encerrando o Dashboard...")
+            import signal
+            os.kill(os.getpid(), signal.SIGTERM)
+
 # ── Função reutilizável de upload de base .xlsb na sidebar ──────────────────
 def _render_sidebar_upload(uploader_key: str):
     """Renderiza o bloco de upload + status da base .xlsb na sidebar."""
@@ -559,13 +568,7 @@ elif st.session_state.page == 'cobranca':
     else:
         st.error("❌ Não foi possível carregar o dashboard de Cobrança")
     
-    # Botão encerrar no fim do sidebar (apenas local/Windows)
-    if platform.system() == 'Windows':
-        st.sidebar.markdown("---")
-        if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
-            st.sidebar.warning("Encerrando o Dashboard...")
-            import signal
-            os.kill(os.getpid(), signal.SIGTERM)
+    _render_encerrar_button()
 
 # Configurações
 elif st.session_state.page == 'config':
@@ -583,10 +586,4 @@ elif st.session_state.page == 'config':
     else:
         st.error("❌ Não foi possível carregar a página de configurações")
     
-    # Botão encerrar no fim do sidebar (apenas local/Windows)
-    if platform.system() == 'Windows':
-        st.sidebar.markdown("---")
-        if st.sidebar.button("⛔ Encerrar Dashboard", use_container_width=True, help="Encerra a aplicação e libera a porta"):
-            st.sidebar.warning("Encerrando o Dashboard...")
-            import signal
-            os.kill(os.getpid(), signal.SIGTERM)
+    _render_encerrar_button()
