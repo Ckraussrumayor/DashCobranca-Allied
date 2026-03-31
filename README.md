@@ -1,52 +1,40 @@
-# Dashboard Zoho CRM - Oportunidades B2B# 📊 Dashboard Zoho CRM - Oportunidades B2B
+# 📋 Dashboard Allied — Controle de Cobrança
 
+Dashboard Streamlit para análise e gestão de boletos em atraso da Allied Brasil (B2B).
 
+## Funcionalidades
 
-Dashboard completo para visualização e gerenciamento de oportunidades do Zoho CRM.Sistema completo de gerenciamento e visualização de oportunidades de vendas B2B, integrado com dados do Zoho CRM.
+- **Dashboard de Cobrança** — métricas, gráficos por faixa de atraso, ranking de vendedores, tabela detalhada com seleção de boletos
+- **Envio de Email** — relatórios individuais, em massa ou único para todos os vendedores (SMTP / Outlook)
+- **Configurações** — cadastro de emails por vendedor, SMTP/IMAP, autenticação 2FA
+- **Backup na nuvem** — persistência de dados e configurações via email (IMAP/SMTP)
+- **Segurança** — login com 2FA, rate limiting, timeout de sessão
 
+## Execução Local
 
-
-## 📋 Características## 🎯 Características Principais
-
-
-
-- **5 Abas de Análise**: Visão Geral, Análise por Vendedor, Análise de Oportunidades, Gerenciar Observações, Dados Completos### 📈 Visualizações e KPIs
-
-- **Filtros Dinâmicos**: Por vendedor, status, estágio, período, valor, etc.- **Métricas em tempo real**: Total de oportunidades, valor total, ticket médio, vendedores ativos e taxa de conversão
-
-- **Gráficos Interativos**: 15+ visualizações com Plotly- **Gráficos interativos**: Distribuição por status, estágio, evolução temporal, top fabricantes e produtos
-
-- **Sistema de Observações**: Múltiplas observações por oportunidade com prioridades e tags- **Funil de vendas**: Visualização do pipeline de vendas por estágio
-
-- **Exportação de Dados**: Excel com dados filtrados- **Análise de perdas**: Identificação e análise de motivos de perda de oportunidades
-
-- **Design Allied**: Cores e logo da empresa integrados
-
-### 🔍 Filtros Dinâmicos
-
-## 🚀 ExecuçãoSistema de filtros múltiplos e combinados:
-
-- Período (data inicial e final)
-
-### Modo Desenvolvimento- Vendedor (multiselect)
-
-```bash- Status da oportunidade
-
-streamlit run app.py- Estágio de venda
-
-```- Revendedor
-
-- Fabricante
-
-Ou use o arquivo de inicialização:- Produto
-
-```bash- Faixa de valor
-
-INICIAR_DASHBOARD.bat- Prioridade
-
+```bash
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-### 👥 Análise por Vendedor
+Ou use os arquivos `.bat` incluídos.
+
+## Deploy (Streamlit Cloud)
+
+1. Faça push para o GitHub
+2. Conecte o repositório no [Streamlit Cloud](https://share.streamlit.io)
+3. Configure os **Secrets** (Settings → Secrets) com o conteúdo de `secrets.toml`
+
+## Tecnologias
+
+- Python 3.10+
+- Streamlit
+- Pandas / Plotly
+- pyxlsb (leitura de `.xlsb`)
+
+---
+
+Desenvolvido por Christian Krauss Rumayor — crumayor@alliedbrasil.com.br
 
 ## 📦 Criar Executável- Performance individual de cada vendedor
 

@@ -4,35 +4,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import calendar
-import os
-import sys
 from pathlib import Path
 import locale
 from config_emails import load_email_config, load_smtp_config, save_smtp_config
 from email_utils import enviar_email_outlook, criar_corpo_email, enviar_email_smtp, verificar_smtp_auth
-
-# Função para obter o diretório base do aplicativo
-def get_base_path():
-    """
-    Retorna o diretório base onde o aplicativo está sendo executado.
-    Funciona para: script Python, executável PyInstaller e Python embarcado.
-    """
-    if getattr(sys, 'frozen', False):
-        # PyInstaller: usa o diretório do executável, não o temporário
-        return Path(sys.executable).parent
-    else:
-        # Script Python ou Python embarcado: usa o diretório do script
-        return Path(__file__).parent.resolve()
-
-BASE_DIR = get_base_path()
+from utils import BASE_DIR
 
 # Configurar locale para português brasileiro
 try:
     locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
-except:
+except Exception:
     try:
         locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')
-    except:
+    except Exception:
         pass
 
 def find_aging_file():
@@ -326,7 +310,7 @@ def formatar_titulo(titulo):
     if '.' in titulo_str:
         try:
             titulo_str = str(int(float(titulo_str)))
-        except:
+        except (ValueError, OverflowError):
             titulo_str = titulo_str.split('.')[0]
     return titulo_str
 
@@ -345,7 +329,7 @@ def formatar_cnpj_cpf(valor):
     if '.' in valor_str:
         try:
             valor_str = str(int(float(valor_str)))
-        except:
+        except (ValueError, OverflowError):
             valor_str = valor_str.split('.')[0]
     # Extrair apenas dígitos
     apenas_numeros = ''.join(c for c in valor_str if c.isdigit())
@@ -954,7 +938,7 @@ def render_dashboard_cobranca():
                             with st.form(key="form_envio_email_todos_unico"):
                                 metodo_envio = st.radio(
                                     "Método de Envio",
-                                    ["� SMTP", "📧 Outlook"],
+                                    ["📮 SMTP", "📧 Outlook"],
                                     horizontal=True
                                 )
                                 
@@ -1061,7 +1045,7 @@ def render_dashboard_cobranca():
                                 with st.form(key="form_envio_email_massa"):
                                     metodo_envio = st.radio(
                                         "Método de Envio",
-                                        ["� SMTP", "📧 Outlook"],
+                                        ["📮 SMTP", "📧 Outlook"],
                                         horizontal=True
                                     )
                                     
@@ -1242,7 +1226,7 @@ def render_dashboard_cobranca():
                         with st.form(key="form_envio_email"):
                             metodo_envio = st.radio(
                                 "Método de Envio",
-                                ["� SMTP", "📧 Outlook"],
+                                ["📮 SMTP", "📧 Outlook"],
                                 horizontal=True
                             )
                             

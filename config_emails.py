@@ -3,21 +3,12 @@ import streamlit as st
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
+from utils import BASE_DIR
 
 # Arquivos de configuração
-CONFIG_FILE = Path(__file__).parent / "email_config.json"
-CONFIG_SMTP_FILE = Path(__file__).parent / "email_config_smtp.json"
-AUTH_CONFIG_FILE = Path(__file__).parent / "auth_config.json"
-
-def get_base_path():
-    """Retorna o diretório base do aplicativo"""
-    import sys
-    if getattr(sys, 'frozen', False):
-        return Path(sys._MEIPASS)
-    else:
-        return Path(__file__).parent
-
-BASE_DIR = get_base_path()
+CONFIG_FILE = BASE_DIR / "email_config.json"
+CONFIG_SMTP_FILE = BASE_DIR / "email_config_smtp.json"
+AUTH_CONFIG_FILE = BASE_DIR / "auth_config.json"
 
 def find_aging_file():
     """Procura por arquivos .xlsb no diretório base"""
@@ -70,13 +61,22 @@ def load_vendedores_do_dashboard():
         return []
 
 def load_email_config():
-    """Carrega configurações de email do arquivo"""
+    """Carrega configurações de email do arquivo local ou st.secrets (Cloud)"""
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {'_global': {'cc': []}, '_vendedores': {}}
+                config = json.load(f)
+                if config and config.get('_vendedores'):
+                    return config
+        except Exception:
+            pass
+    # Fallback: st.secrets (Streamlit Cloud)
+    try:
+        sec = st.secrets.get("email_config", {})
+        if sec:
+            return dict(sec)
+    except Exception:
+        pass
     return {'_global': {'cc': []}, '_vendedores': {}}
 
 def save_email_config(config):
@@ -97,7 +97,7 @@ def load_smtp_config():
                 config = json.load(f)
                 if config and config.get('usuario'):
                     return config
-        except:
+        except Exception:
             pass
     # Fallback: st.secrets (Streamlit Cloud)
     try:

@@ -57,7 +57,7 @@ def verificar_outlook_aberto():
         if PYTHONCOM_AVAILABLE:
             try:
                 pythoncom.CoInitialize()
-            except:
+            except Exception:
                 pass
         
         # Tentar conectar ao Outlook
@@ -95,7 +95,7 @@ def enviar_email_outlook(destinatario, assunto, corpo, cc_list=None, cc_global=N
     if PYTHONCOM_AVAILABLE:
         try:
             pythoncom.CoInitialize()
-        except:
+        except Exception:
             pass  # COM já inicializado
     
     # Validar email destinatário
@@ -265,7 +265,7 @@ def criar_corpo_email(vendedor_nome, df_tabela, data_geracao):
                 valor_total = df_tabela['Saldo Atual'].sum()
         else:
             valor_total = 0
-    except:
+    except Exception:
         valor_total = 0
     
     # Formatar valor total
@@ -402,7 +402,7 @@ def enviar_email_smtp(destinatario, assunto, corpo, cc_list=None, cc_global=None
                             encoders.encode_base64(part)
                             part.add_header('Content-Disposition', f'attachment; filename= {Path(anexo).name}')
                             msg.attach(part)
-                    except:
+                    except Exception:
                         pass  # Ignorar anexos que falhem
         
         # Conectar e enviar

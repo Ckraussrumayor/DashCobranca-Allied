@@ -17,7 +17,7 @@ try:
     import locale
     import shutil
     import hashlib
-    import random
+    import secrets
     import string
     from datetime import datetime, timedelta
 
@@ -32,28 +32,16 @@ except Exception as _import_error:
     st.stop()
 
 # Função para obter o diretório base do aplicativo
-def get_base_path():
-    """
-    Retorna o diretório base onde o aplicativo está sendo executado.
-    Funciona para: script Python, executável PyInstaller e Python embarcado.
-    """
-    if getattr(sys, 'frozen', False):
-        # PyInstaller: usa o diretório do executável, não o temporário
-        return Path(sys.executable).parent
-    else:
-        # Script Python ou Python embarcado: usa o diretório do script
-        return Path(__file__).parent.resolve()
-
-BASE_DIR = get_base_path()
+from utils import get_base_path, BASE_DIR
 sys.path.insert(0, str(BASE_DIR))
 
 # Configurar locale para português brasileiro
 try:
     locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
-except:
+except Exception:
     try:
         locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')
-    except:
+    except Exception:
         pass
 
 # CSS customizado
@@ -109,6 +97,11 @@ st.markdown("""
 if 'page' not in st.session_state:
     st.session_state.page = 'menu'
 
+# ── CONSTANTES DE SEGURANÇA ────────────────────────────────────────────────────
+_MAX_LOGIN_ATTEMPTS = 5
+_LOCKOUT_MINUTES = 5
+_SESSION_TIMEOUT_MINUTES = 60
+
 # ── AUTENTICAÇÃO ──────────────────────────────────────────────────────────────
 def _verificar_credenciais(usuario: str, senha: str) -> bool:
     """Compara usuário e senha com os valores configurados nos secrets."""
@@ -116,9 +109,39 @@ def _verificar_credenciais(usuario: str, senha: str) -> bool:
         usuario_correto = st.secrets["credentials"]["username"]
         senha_correta   = st.secrets["credentials"]["password"]
     except KeyError:
-        usuario_correto = "admin"
-        senha_correta   = "123456"
+        # Sem secrets configurados, bloqueia acesso por segurança
+        return False
     return usuario.strip() == usuario_correto and senha == senha_correta
+
+def _login_bloqueado() -> bool:
+    """Verifica se o login está bloqueado por excesso de tentativas."""
+    bloqueado_ate = st.session_state.get('login_bloqueado_ate')
+    if bloqueado_ate and datetime.now() < bloqueado_ate:
+        return True
+    if bloqueado_ate and datetime.now() >= bloqueado_ate:
+        st.session_state.login_tentativas = 0
+        st.session_state.login_bloqueado_ate = None
+    return False
+
+def _registrar_tentativa_falha():
+    """Incrementa contador de tentativas falhas e bloqueia se exceder limite."""
+    tentativas = st.session_state.get('login_tentativas', 0) + 1
+    st.session_state.login_tentativas = tentativas
+    if tentativas >= _MAX_LOGIN_ATTEMPTS:
+        st.session_state.login_bloqueado_ate = datetime.now() + timedelta(minutes=_LOCKOUT_MINUTES)
+        return True  # bloqueou agora
+    return False
+
+def _verificar_sessao_expirada() -> bool:
+    """Verifica se a sessão autenticada expirou por inatividade."""
+    ultima_atividade = st.session_state.get('ultima_atividade')
+    if ultima_atividade and datetime.now() - ultima_atividade > timedelta(minutes=_SESSION_TIMEOUT_MINUTES):
+        return True
+    return False
+
+def _atualizar_atividade():
+    """Registra timestamp da última atividade do usuário."""
+    st.session_state.ultima_atividade = datetime.now()
 
 def _carregar_config_2fa() -> dict:
     """Carrega config de 2FA: primeiro auth_config.json local, depois secrets."""
@@ -139,7 +162,7 @@ def _carregar_config_2fa() -> dict:
         return {'enabled': False, 'email': ''}
 
 def _gerar_token() -> str:
-    return ''.join(random.choices(string.digits, k=6))
+    return ''.join(secrets.choice(string.digits) for _ in range(6))
 
 def _enviar_token(token: str, email_destino: str):
     """Envia o token 2FA via SMTP configurado."""
@@ -234,6 +257,7 @@ def _render_login():
                     st.session_state.authenticated = True
                     st.session_state.awaiting_2fa = False
                     st.session_state.pop('mfa_token', None)
+                    _atualizar_atividade()
                     st.rerun()
                 else:
                     st.error("❌ Código incorreto. Tente novamente.")
@@ -256,6 +280,13 @@ def _render_login():
 
         # ── ETAPA 1: usuário e senha ────────────────────────────────────────────
         else:
+            # Verificar bloqueio por tentativas excessivas
+            if _login_bloqueado():
+                bloqueado_ate = st.session_state.get('login_bloqueado_ate')
+                restante = (bloqueado_ate - datetime.now()).seconds // 60 + 1
+                st.error(f"🔒 Login bloqueado por excesso de tentativas. Tente novamente em {restante} minuto(s).")
+                st.stop()
+
             with st.form("form_login", clear_on_submit=False):
                 st.text_input("Usuário", key="login_usuario", placeholder="usuário")
                 st.text_input("Senha", type="password", key="login_senha", placeholder="••••••••")
@@ -265,6 +296,9 @@ def _render_login():
                 usuario = st.session_state.get("login_usuario", "")
                 senha   = st.session_state.get("login_senha", "")
                 if _verificar_credenciais(usuario, senha):
+                    # Reset tentativas após login bem-sucedido
+                    st.session_state.login_tentativas = 0
+                    st.session_state.login_bloqueado_ate = None
                     config_2fa = _carregar_config_2fa()
                     if config_2fa.get('enabled') and config_2fa.get('email'):
                         token = _gerar_token()
@@ -280,13 +314,29 @@ def _render_login():
                             st.info("💡 Verifique as configurações de SMTP em ⚙️ Configurações.")
                     else:
                         st.session_state.authenticated = True
+                        _atualizar_atividade()
                         st.rerun()
                 else:
-                    st.error("❌ Usuário ou senha incorretos.")
+                    bloqueou = _registrar_tentativa_falha()
+                    restantes = _MAX_LOGIN_ATTEMPTS - st.session_state.get('login_tentativas', 0)
+                    if bloqueou:
+                        st.error(f"🔒 Login bloqueado por {_LOCKOUT_MINUTES} minutos após {_MAX_LOGIN_ATTEMPTS} tentativas falhas.")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Usuário ou senha incorretos. ({restantes} tentativa(s) restante(s))")
 
 if not st.session_state.get("authenticated", False):
     _render_login()
     st.stop()
+
+# ── TIMEOUT DE SESSÃO ─────────────────────────────────────────────────────────
+if _verificar_sessao_expirada():
+    st.session_state.authenticated = False
+    st.session_state.page = 'menu'
+    st.warning("⏰ Sessão expirada por inatividade. Faça login novamente.")
+    _render_login()
+    st.stop()
+_atualizar_atividade()
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── RECUPERAÇÃO DE DADOS E CONFIGS (após hibernação) ─────────────────────
@@ -394,6 +444,48 @@ except Exception as e:
     st.code(traceback.format_exc())
     config_disponivel = False
 
+# ── Função reutilizável de upload de base .xlsb na sidebar ──────────────────
+def _render_sidebar_upload(uploader_key: str):
+    """Renderiza o bloco de upload + status da base .xlsb na sidebar."""
+    st.sidebar.subheader("🔄 Atualizar Base de Dados")
+    arquivo = st.sidebar.file_uploader(
+        "Selecione o novo arquivo .xlsb",
+        type=["xlsb"],
+        key=uploader_key,
+        help="Selecione um arquivo .xlsb para substituir a base atual"
+    )
+    if arquivo is not None:
+        file_id = f"{arquivo.name}_{arquivo.size}"
+        state_key = f"last_uploaded_{uploader_key}"
+        if st.session_state.get(state_key) != file_id:
+            for f in BASE_DIR.glob("*.xlsb"):
+                if not f.name.startswith("~$"):
+                    f.unlink()
+            novo_caminho = BASE_DIR / arquivo.name
+            novo_caminho.write_bytes(arquivo.getvalue())
+            st.cache_data.clear()
+            st.session_state.pop('df_aging', None)
+            st.session_state.pop('erro_aging', None)
+            st.session_state[state_key] = file_id
+            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo.name}")
+            try:
+                ok_bkp, msg_bkp = enviar_backup_dados(str(novo_caminho))
+                if ok_bkp:
+                    st.sidebar.caption("☁️ Backup atualizado no email")
+                else:
+                    st.sidebar.caption(f"⚠️ Backup: {msg_bkp}")
+            except Exception:
+                pass
+            st.rerun()
+        else:
+            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo.name}")
+    xlsb_atual = [f for f in BASE_DIR.glob("*.xlsb") if not f.name.startswith("~$")]
+    if xlsb_atual:
+        st.sidebar.caption(f"📂 Atual: **{xlsb_atual[0].name}**")
+    else:
+        st.sidebar.warning("⚠️ Nenhuma base carregada")
+    st.sidebar.markdown("---")
+
 # Botão de logout na sidebar (visível em todas as páginas após login)
 with st.sidebar:
     st.markdown("---")
@@ -449,63 +541,7 @@ elif st.session_state.page == 'cobranca':
     
     st.sidebar.markdown("---")
     
-    # Importar / Atualizar base de dados
-    st.sidebar.subheader("🔄 Atualizar Base de Dados")
-    
-    arquivo_upload = st.sidebar.file_uploader(
-        "Selecione o novo arquivo .xlsb",
-        type=["xlsb"],
-        key="upload_cobranca",
-        help="Selecione um arquivo .xlsb para substituir a base atual"
-    )
-    
-    if arquivo_upload is not None:
-        # Verificar se este arquivo já foi processado (evita loop infinito no rerun)
-        file_id = f"{arquivo_upload.name}_{arquivo_upload.size}"
-        if st.session_state.get('last_uploaded_cobranca') != file_id:
-            # Remover arquivo(s) .xlsb atual(is) da pasta do app
-            for f in BASE_DIR.glob("*.xlsb"):
-                if not f.name.startswith("~$"):
-                    f.unlink()
-            
-            # Salvar novo arquivo na pasta do app
-            novo_caminho = BASE_DIR / arquivo_upload.name
-            novo_caminho.write_bytes(arquivo_upload.getvalue())
-            
-            # Limpar cache e session state de dados antigos
-            st.cache_data.clear()
-            if 'df_aging' in st.session_state:
-                del st.session_state['df_aging']
-            if 'erro_aging' in st.session_state:
-                del st.session_state['erro_aging']
-            
-            # Marcar arquivo como já processado
-            st.session_state['last_uploaded_cobranca'] = file_id
-            
-            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo_upload.name}")
-            
-            # Backup automático no email
-            try:
-                ok_bkp, msg_bkp = enviar_backup_dados(str(novo_caminho))
-                if ok_bkp:
-                    st.sidebar.caption("☁️ Backup atualizado no email")
-                else:
-                    st.sidebar.caption(f"⚠️ Backup: {msg_bkp}")
-            except Exception:
-                pass
-            
-            st.rerun()
-        else:
-            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo_upload.name}")
-    
-    # Mostrar arquivo atual
-    xlsb_atual = [f for f in BASE_DIR.glob("*.xlsb") if not f.name.startswith("~$")]
-    if xlsb_atual:
-        st.sidebar.caption(f"📂 Atual: **{xlsb_atual[0].name}**")
-    else:
-        st.sidebar.warning("⚠️ Nenhuma base carregada")
-    
-    st.sidebar.markdown("---")
+    _render_sidebar_upload("upload_cobranca")
     
     if cobranca_disponivel:
         render_dashboard_cobranca()
@@ -529,59 +565,7 @@ elif st.session_state.page == 'config':
     
     st.sidebar.markdown("---")
     
-    # Importar / Atualizar base de dados
-    st.sidebar.subheader("🔄 Atualizar Base de Dados")
-    
-    arquivo_upload_cfg = st.sidebar.file_uploader(
-        "Selecione o novo arquivo .xlsb",
-        type=["xlsb"],
-        key="upload_config",
-        help="Selecione um arquivo .xlsb para substituir a base atual"
-    )
-    
-    if arquivo_upload_cfg is not None:
-        # Verificar se este arquivo já foi processado (evita loop infinito no rerun)
-        file_id_cfg = f"{arquivo_upload_cfg.name}_{arquivo_upload_cfg.size}"
-        if st.session_state.get('last_uploaded_config') != file_id_cfg:
-            for f in BASE_DIR.glob("*.xlsb"):
-                if not f.name.startswith("~$"):
-                    f.unlink()
-            
-            novo_caminho = BASE_DIR / arquivo_upload_cfg.name
-            novo_caminho.write_bytes(arquivo_upload_cfg.getvalue())
-            
-            st.cache_data.clear()
-            if 'df_aging' in st.session_state:
-                del st.session_state['df_aging']
-            if 'erro_aging' in st.session_state:
-                del st.session_state['erro_aging']
-            
-            # Marcar arquivo como já processado
-            st.session_state['last_uploaded_config'] = file_id_cfg
-            
-            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo_upload_cfg.name}")
-            
-            # Backup automático no email
-            try:
-                ok_bkp, msg_bkp = enviar_backup_dados(str(novo_caminho))
-                if ok_bkp:
-                    st.sidebar.caption("☁️ Backup atualizado no email")
-                else:
-                    st.sidebar.caption(f"⚠️ Backup: {msg_bkp}")
-            except Exception:
-                pass
-            
-            st.rerun()
-        else:
-            st.sidebar.success(f"✅ Base atualizada!\n📁 {arquivo_upload_cfg.name}")
-    
-    xlsb_atual = [f for f in BASE_DIR.glob("*.xlsb") if not f.name.startswith("~$")]
-    if xlsb_atual:
-        st.sidebar.caption(f"📂 Atual: **{xlsb_atual[0].name}**")
-    else:
-        st.sidebar.warning("⚠️ Nenhuma base carregada")
-    
-    st.sidebar.markdown("---")
+    _render_sidebar_upload("upload_config")
     
     if config_disponivel:
         render_configuracoes()
