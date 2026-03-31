@@ -90,14 +90,29 @@ def save_email_config(config):
         return False
 
 def load_smtp_config():
-    """Carrega configurações SMTP"""
+    """Carrega configurações SMTP do arquivo local ou st.secrets (Cloud)"""
     if CONFIG_SMTP_FILE.exists():
         try:
             with open(CONFIG_SMTP_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                config = json.load(f)
+                if config and config.get('usuario'):
+                    return config
         except:
-            return {}
-    return {}
+            pass
+    # Fallback: st.secrets (Streamlit Cloud)
+    try:
+        sec = st.secrets["smtp"]
+        return {
+            'servidor': sec["servidor"],
+            'porta': int(sec.get("porta", 587)),
+            'usuario': sec["usuario"],
+            'senha': sec["senha"],
+            'usar_tls': sec.get("usar_tls", True),
+            'servidor_imap': sec.get("servidor_imap", ""),
+            'porta_imap': int(sec.get("porta_imap", 993)),
+        }
+    except Exception:
+        return {}
 
 def save_smtp_config(config):
     """Salva configurações SMTP"""
@@ -110,14 +125,26 @@ def save_smtp_config(config):
         return False
 
 def load_auth_config() -> dict:
-    """Carrega configuração de autenticação 2FA do arquivo local."""
+    """Carrega configuração de autenticação 2FA do arquivo local ou st.secrets (Cloud)."""
     if AUTH_CONFIG_FILE.exists():
         try:
             with open(AUTH_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                config = json.load(f)
+                if config:
+                    return config
         except Exception:
-            return {}
-    return {}
+            pass
+    # Fallback: st.secrets (Streamlit Cloud)
+    try:
+        sec = st.secrets["two_factor"]
+        return {
+            'two_factor': {
+                'enabled': sec.get("enabled", False),
+                'email': sec.get("email", ""),
+            }
+        }
+    except Exception:
+        return {}
 
 def save_auth_config(config: dict) -> bool:
     """Salva configuração de autenticação 2FA no arquivo local."""
