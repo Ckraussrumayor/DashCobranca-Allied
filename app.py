@@ -164,14 +164,25 @@ def _carregar_config_2fa() -> dict:
 def _gerar_token() -> str:
     return ''.join(secrets.choice(string.digits) for _ in range(6))
 
-def _enviar_token(token: str, email_destino: str):
-    """Envia o token 2FA via SMTP configurado."""
+def _enviar_token(token: str, email_destino):
+    """Envia o token 2FA via SMTP. email_destino pode ser string única ou lista."""
     try:
         from config_emails import load_smtp_config
         from email_utils import enviar_email_smtp
+
+        # Normalizar para lista de emails
+        if isinstance(email_destino, str):
+            emails = [e.strip() for e in email_destino.replace(';', ',').replace('\n', ',').split(',') if e.strip() and '@' in e.strip()]
+        else:
+            emails = [e.strip() for e in email_destino if e.strip() and '@' in e.strip()]
+
+        if not emails:
+            return False, "Nenhum email válido configurado para receber o código 2FA."
+
         smtp = load_smtp_config()
         if not smtp or not smtp.get('usuario'):
             return False, "SMTP não configurado. Acesse ⚙️ Configurações → SMTP."
+
         corpo = f"""
         <html><body style="font-family:Arial,sans-serif; color:#333; margin:30px;">
         <div style="background:#0066cc; color:white; padding:15px; border-radius:8px; margin-bottom:20px;">
@@ -185,16 +196,26 @@ def _enviar_token(token: str, email_destino: str):
         <p style="color:#999; font-size:12px;">Se você não solicitou este código, ignore este email.</p>
         </body></html>
         """
-        return enviar_email_smtp(
-            email_destino,
-            "🔐 Código de verificação - Dashboard Allied",
-            corpo,
-            servidor_smtp=smtp.get('servidor'),
-            porta=smtp.get('porta', 587),
-            usuario=smtp.get('usuario'),
-            senha=smtp.get('senha'),
-            usar_tls=smtp.get('usar_tls', True)
-        )
+
+        erros = []
+        for email in emails:
+            sucesso, msg = enviar_email_smtp(
+                email,
+                "🔐 Código de verificação - Dashboard Allied",
+                corpo,
+                servidor_smtp=smtp.get('servidor'),
+                porta=smtp.get('porta', 587),
+                usuario=smtp.get('usuario'),
+                senha=smtp.get('senha'),
+                usar_tls=smtp.get('usar_tls', True)
+            )
+            if not sucesso:
+                erros.append(f"{email}: {msg}")
+
+        if erros:
+            return False, "\n".join(erros)
+        return True, f"Código enviado para: {', '.join(emails)}"
+
     except Exception as e:
         return False, f"Erro ao enviar token: {str(e)}"
 
@@ -235,23 +256,17 @@ def _render_login():
                 st.stop()
 
             email_destino = st.session_state.get('mfa_email', '')
-            partes = email_destino.split('@')
-            if len(partes) == 2:
-                email_exibido = partes[0][:2] + '***@' + partes[1]
-            else:
-                email_exibido = "o email configurado"
+            # Mascarar emails para exibição (suporte a múltiplos)
+            emails_lista = [e.strip() for e in str(email_destino).replace(';', ',').replace('\n', ',').split(',') if e.strip() and '@' in e.strip()]
+            def _mascarar(e):
+                partes = e.split('@')
+                return partes[0][:2] + '***@' + partes[1] if len(partes) == 2 else e
+            email_exibido = ', '.join(_mascarar(e) for e in emails_lista) if emails_lista else "o email configurado"
 
-            # Fallback: SMTP falhou — exibir código direto na tela
-            fallback_token = st.session_state.get('mfa_fallback_token')
-            if fallback_token:
-                st.warning("⚠️ Não foi possível enviar o código por email (falha no SMTP).")
-                st.markdown(
-                    f"<div style='background:#fff3cd;border-left:4px solid #ff6b35;padding:16px;"
-                    f"border-radius:6px;text-align:center;margin:10px 0;'>"
-                    f"<p style='margin:0;font-size:13px;color:#666;'>Seu código de verificação:</p>"
-                    f"<p style='margin:6px 0 0;letter-spacing:12px;font-size:2rem;"
-                    f"font-weight:bold;color:#ff6b35;'>{fallback_token}</p></div>",
-                    unsafe_allow_html=True
+            if st.session_state.get('mfa_smtp_erro'):
+                st.error(
+                    "❌ Falha ao enviar o código por email. "
+                    "Verifique as configurações de SMTP em ⚙️ Configurações → SMTP."
                 )
             else:
                 st.info(f"📧 Código enviado para **{email_exibido}**. Verifique sua caixa de entrada.")
@@ -287,11 +302,7 @@ def _render_login():
                 st.session_state.mfa_token   = token
                 st.session_state.mfa_expires = datetime.now() + timedelta(minutes=5)
                 sucesso, msg = _enviar_token(token, config_2fa.get('email', ''))
-                if sucesso:
-                    st.session_state.pop('mfa_fallback_token', None)
-                    st.success("✅ Novo código enviado!")
-                else:
-                    st.session_state.mfa_fallback_token = token
+                st.session_state.mfa_smtp_erro = not sucesso
                 st.rerun()
 
         # ── ETAPA 1: usuário e senha ────────────────────────────────────────────
@@ -319,12 +330,11 @@ def _render_login():
                     if config_2fa.get('enabled') and config_2fa.get('email'):
                         token = _gerar_token()
                         sucesso, msg = _enviar_token(token, config_2fa['email'])
-                        st.session_state.mfa_token   = token
-                        st.session_state.mfa_expires = datetime.now() + timedelta(minutes=5)
-                        st.session_state.mfa_email   = config_2fa['email']
+                        st.session_state.mfa_token    = token
+                        st.session_state.mfa_expires  = datetime.now() + timedelta(minutes=5)
+                        st.session_state.mfa_email    = config_2fa['email']
+                        st.session_state.mfa_smtp_erro = not sucesso
                         st.session_state.awaiting_2fa = True
-                        if not sucesso:
-                            st.session_state.mfa_fallback_token = token
                         st.rerun()
                     else:
                         st.session_state.authenticated = True

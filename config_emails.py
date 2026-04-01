@@ -489,31 +489,36 @@ def render_configuracoes():
             key="toggle_2fa"
         )
 
-        email_2fa = st.text_input(
-            "Email que receberá o código de verificação",
+        email_2fa = st.text_area(
+            "Email(s) que receberão o código de verificação",
             value=dois_fatores.get('email', ''),
-            placeholder="admin@suaempresa.com.br",
-            help="Este email receberá o código toda vez que alguém fizer login"
+            placeholder="admin@empresa.com.br, gerente@empresa.com.br",
+            help="Separe múltiplos emails com vírgula ou quebra de linha. Todos receberão o código 2FA.",
+            height=100
         )
+
+        # Validar e listar emails informados
+        emails_validos = [e.strip() for e in email_2fa.replace(';', ',').replace('\n', ',').split(',') if e.strip() and '@' in e.strip()]
+        if email_2fa.strip() and emails_validos:
+            st.caption(f"📋 {len(emails_validos)} email(s) configurado(s): " + " | ".join(emails_validos))
 
         col_btn1, col_btn2 = st.columns(2)
 
         with col_btn1:
             if st.button("💾 Salvar", use_container_width=True, key="btn_salvar_2fa"):
-                if habilitado and not email_2fa.strip():
-                    st.error("❌ Informe um email para receber o código 2FA.")
-                elif habilitado and '@' not in email_2fa:
-                    st.error("❌ Email inválido.")
+                emails_validos_salvar = [e.strip() for e in email_2fa.replace(';', ',').replace('\n', ',').split(',') if e.strip() and '@' in e.strip()]
+                if habilitado and not emails_validos_salvar:
+                    st.error("❌ Informe ao menos um email válido para receber o código 2FA.")
                 else:
                     novo_auth = {
                         'two_factor': {
                             'enabled': habilitado,
-                            'email': email_2fa.strip()
+                            'email': ', '.join(emails_validos_salvar)
                         }
                     }
                     if save_auth_config(novo_auth):
                         if habilitado:
-                            st.success(f"✅ 2FA habilitado! Código será enviado para: {email_2fa.strip()}")
+                            st.success(f"✅ 2FA habilitado! Código será enviado para: {', '.join(emails_validos_salvar)}")
                         else:
                             st.success("✅ 2FA desabilitado.")
                         try:
@@ -524,8 +529,9 @@ def render_configuracoes():
 
         with col_btn2:
             if st.button("🧪 Testar Envio", use_container_width=True, key="btn_testar_2fa"):
-                if not email_2fa.strip() or '@' not in email_2fa:
-                    st.error("❌ Informe um email válido antes de testar.")
+                emails_teste = [e.strip() for e in email_2fa.replace(';', ',').replace('\n', ',').split(',') if e.strip() and '@' in e.strip()]
+                if not emails_teste:
+                    st.error("❌ Informe ao menos um email válido antes de testar.")
                 else:
                     with st.spinner("Enviando código de teste..."):
                         try:
@@ -548,26 +554,31 @@ def render_configuracoes():
                                 <p style="color:#999; font-size:12px;">Este é um email de teste do sistema 2FA.</p>
                                 </body></html>
                                 """
-                                sucesso, msg = enviar_email_smtp(
-                                    email_2fa.strip(),
-                                    "🔐 [TESTE] Código de verificação - Dashboard Allied",
-                                    corpo_teste,
-                                    servidor_smtp=smtp_cfg.get('servidor'),
-                                    porta=smtp_cfg.get('porta', 587),
-                                    usuario=smtp_cfg.get('usuario'),
-                                    senha=smtp_cfg.get('senha'),
-                                    usar_tls=smtp_cfg.get('usar_tls', True)
-                                )
-                                if sucesso:
-                                    st.success(f"✅ Email de teste enviado! Código: **{token_teste}**")
+                                erros_teste = []
+                                for email_t in emails_teste:
+                                    ok, msg_t = enviar_email_smtp(
+                                        email_t,
+                                        "🔐 [TESTE] Código de verificação - Dashboard Allied",
+                                        corpo_teste,
+                                        servidor_smtp=smtp_cfg.get('servidor'),
+                                        porta=smtp_cfg.get('porta', 587),
+                                        usuario=smtp_cfg.get('usuario'),
+                                        senha=smtp_cfg.get('senha'),
+                                        usar_tls=smtp_cfg.get('usar_tls', True)
+                                    )
+                                    if not ok:
+                                        erros_teste.append(f"{email_t}: {msg_t}")
+                                if erros_teste:
+                                    st.error("❌ Falha em: " + " | ".join(erros_teste))
                                 else:
-                                    st.error(f"❌ {msg}")
+                                    st.success(f"✅ Email de teste enviado para {len(emails_teste)} destinatário(s)! Código: **{token_teste}**")
                         except Exception as e:
                             st.error(f"❌ Erro: {str(e)}")
 
         st.markdown("---")
         if dois_fatores.get('enabled'):
-            st.success(f"✅ 2FA **habilitado** | Código enviado para: **{dois_fatores.get('email', '')}**")
+            emails_conf = dois_fatores.get('email', '')
+            st.success(f"✅ 2FA **habilitado** | Código enviado para: **{emails_conf}**")
         else:
             st.warning("⚠️ 2FA **desabilitado** — qualquer pessoa com usuário/senha terá acesso direto.")
 
