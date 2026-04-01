@@ -428,7 +428,17 @@ def enviar_email_smtp(destinatario, assunto, corpo, cc_list=None, cc_global=None
         return True, f"✅ Email enviado com sucesso!\n\nPara: {destinatario}{cc_info}\nVia: SMTP ({servidor_smtp})"
         
     except smtplib.SMTPAuthenticationError:
-        return False, "❌ Erro de autenticação SMTP\n\nDica: Verifique usuário/senha\nPara Gmail: use senha de app (https://myaccount.google.com/apppasswords)"
+        usuario_masked = usuario if usuario else '(vazio)'
+        senha_preview = f"{senha[:4]}...{senha[-4:]}" if senha and len(senha) > 8 else '****'
+        return False, (
+            f"❌ Erro de autenticação SMTP\n\n"
+            f"Conta: {usuario_masked}\n"
+            f"Servidor: {servidor_smtp}:{porta}\n"
+            f"Senha (prévia): {senha_preview}\n\n"
+            f"Dica: Verifique usuário/senha\n"
+            f"Para Gmail: use senha de app (https://myaccount.google.com/apppasswords)\n"
+            f"⚠️ A senha de app deve ser gerada especificamente para esta conta Google."
+        )
     except smtplib.SMTPException as e:
         return False, f"❌ Erro SMTP: {str(e)}"
     except Exception as e:
