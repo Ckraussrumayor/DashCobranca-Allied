@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.header import Header
 import re
 
 try:
@@ -393,12 +394,12 @@ def enviar_email_smtp(destinatario, assunto, corpo, cc_list=None, cc_global=None
         msg = MIMEMultipart('alternative')
         msg['From'] = usuario
         msg['To'] = destinatario
-        msg['Subject'] = assunto
+        msg['Subject'] = Header(assunto, 'utf-8')
         if todos_ccs:
             msg['Cc'] = ', '.join(todos_ccs)
         
         # Adicionar corpo HTML
-        msg.attach(MIMEText(corpo, 'html'))
+        msg.attach(MIMEText(corpo, 'html', 'utf-8'))
         
         # Adicionar anexos
         if anexos:
