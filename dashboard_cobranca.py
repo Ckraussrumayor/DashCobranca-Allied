@@ -732,7 +732,8 @@ def render_dashboard_cobranca():
             df_exibir['Saldo Atual'] = df_exibir['Saldo Atual'].apply(formatar_moeda_br)
         
         if 'Última Ocorrência' in df_exibir.columns:
-            df_exibir['Última Ocorrência'] = pd.to_datetime(df_exibir['Última Ocorrência'], errors='coerce').dt.strftime('%d/%m/%Y')
+            _dt_temp = pd.to_datetime(df_exibir['Última Ocorrência'], errors='coerce')
+            df_exibir['Última Ocorrência'] = _dt_temp.apply(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else '')
         
         # Substituir todos os None/NaN por string vazia em todas as colunas de texto
         # Primeiro converter Categorical para string para evitar erro de categoria
