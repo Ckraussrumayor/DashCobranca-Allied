@@ -412,12 +412,12 @@ def render_dashboard_cobranca():
     
     # Filtrar apenas Diretor = "B2B" (caso a coluna exista)
     if 'Diretor' in df.columns:
-        df = df[df['Diretor'] == 'B2B'].copy()
+        df = df[df['Diretor'] == 'B2B']
     
     # Filtrar apenas Portador Ajustado com valores específicos
     portadores_permitidos = ['Boleto', 'Disponível', 'TED', 'Serviço']
     if 'Portador Ajustado' in df.columns:
-        df = df[df['Portador Ajustado'].isin(portadores_permitidos)].copy()
+        df = df[df['Portador Ajustado'].isin(portadores_permitidos)]
     
     if df.empty:
         st.warning("⚠️ Nenhum dado disponível após filtros (Diretor 'B2B' e Portadores: Boleto, Disponível, TED, Serviço)")
@@ -465,7 +465,7 @@ def render_dashboard_cobranca():
     )
     
     # Filtrar apenas registros em atraso
-    df_atraso = df[df['Dias_Atraso'].notna()].copy()
+    df_atraso = df[df['Dias_Atraso'].notna()]
     
     if df_atraso.empty:
         st.success("✅ Nenhum boleto em atraso encontrado!")
@@ -491,9 +491,9 @@ def render_dashboard_cobranca():
     
     # Filtrar por vendedor
     if vendedor_selecionado != "TODOS":
-        df_filtrado = df_atraso[df_atraso['Nome Vendedor'] == vendedor_selecionado].copy()
+        df_filtrado = df_atraso[df_atraso['Nome Vendedor'] == vendedor_selecionado]
     else:
-        df_filtrado = df_atraso.copy()
+        df_filtrado = df_atraso
     
     # Métricas principais
     col1, col2, col3, col4 = st.columns(4)

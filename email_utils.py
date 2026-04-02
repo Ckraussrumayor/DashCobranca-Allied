@@ -17,6 +17,22 @@ try:
 except ImportError:
     OUTLOOK_AVAILABLE = False
 
+# ── Regex pré-compilada para remoção de emojis (compilada UMA vez no import) ─
+_EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    "\U0001F680-\U0001F6FF"  # transport & map symbols
+    "\U0001F1E0-\U0001F1FF"  # flags
+    "\U00002702-\U000027B0"  # dingbats
+    "\U000024C2-\U0001F251"  # enclosed characters
+    "\U0001F900-\U0001F9FF"  # supplemental symbols
+    "\U00002600-\U000026FF"  # misc symbols (inclui ⚪)
+    "\U00002700-\U000027BF"  # dingbats
+    "]+",
+    flags=re.UNICODE
+)
+
 # ── Template HTML do email de boletos ────────────────────────────────────────
 EMAIL_TEMPLATE = """
 <html>
@@ -80,22 +96,7 @@ def limpar_emojis(texto):
     """Remove emojis e caracteres especiais Unicode do texto"""
     if not texto:
         return ''
-    # Padrão regex para remover emojis e símbolos unicode
-    emoji_pattern = re.compile(
-        "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map symbols
-        "\U0001F1E0-\U0001F1FF"  # flags
-        "\U00002702-\U000027B0"  # dingbats
-        "\U000024C2-\U0001F251"  # enclosed characters
-        "\U0001F900-\U0001F9FF"  # supplemental symbols
-        "\U00002600-\U000026FF"  # misc symbols (inclui ⚪)
-        "\U00002700-\U000027BF"  # dingbats
-        "]+", 
-        flags=re.UNICODE
-    )
-    return emoji_pattern.sub('', str(texto)).strip()
+    return _EMOJI_PATTERN.sub('', str(texto)).strip()
 
 
 def verificar_outlook_aberto():

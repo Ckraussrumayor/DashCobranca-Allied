@@ -148,7 +148,13 @@ def restaurar_backup_configs(destino_dir):
         return False, resultado
     zip_path = Path(resultado)
     try:
+        destino = Path(destino_dir).resolve()
         with zipfile.ZipFile(zip_path, 'r') as zf:
+            # Validar contra path traversal antes de extrair
+            for member in zf.namelist():
+                member_path = (destino / member).resolve()
+                if not str(member_path).startswith(str(destino)):
+                    return False, f"Arquivo suspeito no backup: {member}"
             zf.extractall(destino_dir)
         zip_path.unlink()
         return True, "Configurações restauradas do backup."
