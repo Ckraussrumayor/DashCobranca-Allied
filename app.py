@@ -296,13 +296,18 @@ def _render_login():
                 st.rerun()
 
             st.markdown("---")
-            if st.button("🔄 Reenviar código", use_container_width=True):
+            ultimo_envio = st.session_state.get('mfa_ultimo_envio')
+            segundos_restantes = max(0, 30 - int((datetime.now() - ultimo_envio).total_seconds())) if ultimo_envio else 0
+            reenviar_desabilitado = segundos_restantes > 0
+            label_reenviar = f"🔄 Aguarde {segundos_restantes}s para reenviar" if reenviar_desabilitado else "🔄 Reenviar código"
+            if st.button(label_reenviar, use_container_width=True, disabled=reenviar_desabilitado):
                 config_2fa = _carregar_config_2fa()
                 token = _gerar_token()
                 st.session_state.mfa_token   = token
                 st.session_state.mfa_expires = datetime.now() + timedelta(minutes=5)
                 sucesso, msg = _enviar_token(token, config_2fa.get('email', ''))
                 st.session_state.mfa_smtp_erro = not sucesso
+                st.session_state.mfa_ultimo_envio = datetime.now()
                 st.rerun()
 
         # ── ETAPA 1: usuário e senha ────────────────────────────────────────────
@@ -328,12 +333,16 @@ def _render_login():
                     st.session_state.login_bloqueado_ate = None
                     config_2fa = _carregar_config_2fa()
                     if config_2fa.get('enabled') and config_2fa.get('email'):
-                        token = _gerar_token()
-                        sucesso, msg = _enviar_token(token, config_2fa['email'])
-                        st.session_state.mfa_token    = token
-                        st.session_state.mfa_expires  = datetime.now() + timedelta(minutes=5)
-                        st.session_state.mfa_email    = config_2fa['email']
-                        st.session_state.mfa_smtp_erro = not sucesso
+                        # Throttle: evitar envios duplicados ao clicar várias vezes (instabilidade de rede)
+                        ultimo_envio = st.session_state.get('mfa_ultimo_envio')
+                        if not ultimo_envio or (datetime.now() - ultimo_envio).total_seconds() > 30:
+                            token = _gerar_token()
+                            sucesso, msg = _enviar_token(token, config_2fa['email'])
+                            st.session_state.mfa_token    = token
+                            st.session_state.mfa_expires  = datetime.now() + timedelta(minutes=5)
+                            st.session_state.mfa_email    = config_2fa['email']
+                            st.session_state.mfa_smtp_erro = not sucesso
+                            st.session_state.mfa_ultimo_envio = datetime.now()
                         st.session_state.awaiting_2fa = True
                         st.rerun()
                     else:
