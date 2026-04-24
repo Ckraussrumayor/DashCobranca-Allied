@@ -333,17 +333,25 @@ def _render_login():
                     st.session_state.login_bloqueado_ate = None
                     config_2fa = _carregar_config_2fa()
                     if config_2fa.get('enabled') and config_2fa.get('email'):
-                        # Throttle: evitar envios duplicados ao clicar várias vezes (instabilidade de rede)
+                        # Throttle: evitar envios duplicados ao clicar várias vezes (instabilidade de rede).
+                        # Os flags são gravados ANTES do envio SMTP para que qualquer rerun subsequente
+                        # já encontre awaiting_2fa=True e pule o envio, mesmo que o script seja
+                        # interrompido durante a chamada bloqueante ao servidor de e-mail.
                         ultimo_envio = st.session_state.get('mfa_ultimo_envio')
                         if not ultimo_envio or (datetime.now() - ultimo_envio).total_seconds() > 30:
                             token = _gerar_token()
+                            # Gravar flags PRIMEIRO — impede reenvio se o rerun for interrompido
+                            st.session_state.mfa_token         = token
+                            st.session_state.mfa_expires       = datetime.now() + timedelta(minutes=5)
+                            st.session_state.mfa_email         = config_2fa['email']
+                            st.session_state.mfa_ultimo_envio  = datetime.now()
+                            st.session_state.awaiting_2fa      = True
+                            st.session_state.mfa_smtp_erro     = False
                             sucesso, msg = _enviar_token(token, config_2fa['email'])
-                            st.session_state.mfa_token    = token
-                            st.session_state.mfa_expires  = datetime.now() + timedelta(minutes=5)
-                            st.session_state.mfa_email    = config_2fa['email']
-                            st.session_state.mfa_smtp_erro = not sucesso
-                            st.session_state.mfa_ultimo_envio = datetime.now()
-                        st.session_state.awaiting_2fa = True
+                            st.session_state.mfa_smtp_erro     = not sucesso
+                        else:
+                            # Token já enviado recentemente: apenas navega para a tela do código
+                            st.session_state.awaiting_2fa = True
                         st.rerun()
                     else:
                         st.session_state.authenticated = True
